@@ -17,6 +17,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "amqplib": "^0.10.8",
+    "axios": "^1.9.0",
     "body-parser": "^2.2.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -28,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
+    "@types/amqplib": "^0.10.7",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
