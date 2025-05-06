@@ -1,6 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { getPool } from '../util/dbPool.util';
-import { IBooking } from '../interface/booking.interface';
+import { IBooking, IBookingRequest } from '../interface/booking.interface';
 import { IStatus } from '../types/status.types';
 
 export class BookingRepository {
@@ -10,7 +10,7 @@ export class BookingRepository {
     this.pool = getPool();
   }
 
-  async createBooking(data: IBooking): Promise<IBooking> {
+  async createBooking(data: IBookingRequest): Promise<IBooking> {
     const client: PoolClient = await this.pool.connect();
     try {
       const query = `
