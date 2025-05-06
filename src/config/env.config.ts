@@ -10,3 +10,6 @@ export const DB_PORT = process.env.DB_PORT;
 export const DB_NAME = process.env.DB_NAME;
 export const DB_URL = process.env.DB_URL;
 export const NODE_ENV = process.env.NODE_ENV;
+export const AIRLINE_SEARCH_API_KEY = process.env.AIRLINE_SEARCH_API_KEY;
+export const AIRLINE_MESSAGE_QUEUE_URL = process.env.AIRLINE_MESSAGE_QUEUE_URL as string;
+export const AIRLINE_MESSAGE_QUEUE_NAME = process.env.AIRLINE_MESSAGE_QUEUE_NAME as string;
