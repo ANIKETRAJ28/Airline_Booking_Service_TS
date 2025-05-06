@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { IBooking } from '../interface/booking.interface';
 import { BookingService } from '../service/booking.service';
 import { IStatus } from '../types/status.types';
 
@@ -12,8 +11,8 @@ export class BookingController {
 
   createBooking = async (req: Request, res: Response): Promise<void> => {
     try {
-      const data: IBooking = req.body;
-      if (!data.user_id || !data.flight_id || !data.status || !data.seats || !data.total_price) {
+      const data: { user_email: string; user_id: string; flight_id: string; seats: number } = req.body;
+      if (!data.user_id || !data.flight_id || !data.seats) {
         res.status(400).json({ message: 'All fields are required' });
         return;
       }
