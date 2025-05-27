@@ -11,12 +11,22 @@ export class BookingController {
 
   createBooking = async (req: Request, res: Response): Promise<void> => {
     try {
-      const data: { user_email: string; user_id: string; flight_id: string; seats: number } = req.body;
-      if (!data.user_id || !data.flight_id || !data.seats) {
+      const { email, id } = req;
+      if (!email || !id) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+      const data: { flight_id: string; seats: number } = req.body;
+      if (!data.flight_id || !data.seats) {
         res.status(400).json({ message: 'All fields are required' });
         return;
       }
-      const booking = await this.bookingService.createBooking(data);
+      const booking = await this.bookingService.createBooking({
+        flight_id: data.flight_id,
+        seats: data.seats,
+        user_id: id,
+        user_email: email,
+      });
       res.status(201).json(booking);
     } catch (error) {
       console.log('Error in BookingController: createBooking:', error);
@@ -79,7 +89,7 @@ export class BookingController {
 
   getBookingsByUserId = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.params.userId;
+      const userId = req.id;
       if (!userId) {
         res.status(400).json({ message: 'User ID is required' });
         return;
@@ -92,17 +102,14 @@ export class BookingController {
     }
   };
 
-  getBookingsForFlightByDate = async (req: Request, res: Response): Promise<void> => {
+  getBookingsForFlight = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { flight_id, date } = req.query;
-      if (!flight_id || !date) {
+      const flight_id = req.params.flight_id;
+      if (!flight_id) {
         res.status(400).json({ message: 'Flight ID and date are required' });
         return;
       }
-      const bookings = await this.bookingService.getBookingsForFlightByDate(
-        flight_id as string,
-        new Date(date as string),
-      );
+      const bookings = await this.bookingService.getBookingsForFlight(flight_id as string);
       res.status(200).json(bookings);
     } catch (error) {
       console.log('Error in BookingController: getBookingsForFlightByDate:', error);

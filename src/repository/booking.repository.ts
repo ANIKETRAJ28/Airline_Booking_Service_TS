@@ -88,15 +88,15 @@ export class BookingRepository {
     }
   }
 
-  async getBookingsForFlightByDate(flightId: string, date: Date): Promise<IBooking[]> {
+  async getBookingsForFlight(flightId: string): Promise<IBooking[]> {
     const client: PoolClient = await this.pool.connect();
     try {
-      const query = `SELECT * FROM booking WHERE flight_id = $1 AND created_at::date = $2`;
-      const result = await client.query(query, [flightId, date]);
+      const query = `SELECT * FROM booking WHERE flight_id = $1`;
+      const result = await client.query(query, [flightId]);
       const bookings: IBooking[] = result.rows;
       return bookings;
     } catch (error) {
-      console.log('Error in BookingRepository: getBookingsForFlightByDate:', error);
+      console.log('Error in BookingRepository: getBookingsForFlight:', error);
       throw error;
     } finally {
       client.release();

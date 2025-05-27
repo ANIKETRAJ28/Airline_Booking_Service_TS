@@ -108,9 +108,9 @@ export class BookingService {
     }
   }
 
-  async getBookingsForFlightByDate(flightId: string, date: Date): Promise<IBooking[]> {
+  async getBookingsForFlight(flightId: string): Promise<IBooking[]> {
     try {
-      const bookings = await this.bookingRepository.getBookingsForFlightByDate(flightId, date);
+      const bookings = await this.bookingRepository.getBookingsForFlight(flightId);
       return bookings;
     } catch (error) {
       console.log('Error in BookingService: getBookingsForFlightByDate:', error);
