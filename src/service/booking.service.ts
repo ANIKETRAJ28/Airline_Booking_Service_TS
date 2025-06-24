@@ -1,12 +1,10 @@
 import axios from 'axios';
-import { IBooking } from '../interface/booking.interface';
+import { IBooking, IBookingRequest } from '../interface/booking.interface';
 import { BookingRepository } from '../repository/booking.repository';
-import { IStatus } from '../types/status.types';
-import { AIRLINE_SEARCH_API_KEY } from '../config/env.config';
-import { INotification } from '../interface/notification.interface';
-import { notificationSubject } from '../util/notificationSubject.util';
-import { notificationBody } from '../util/notificationBody.util';
+import { IStatus } from '../types/booking.types';
+import { AIRLINE_BOOKING_QUEUE_NAME, AIRLINE_BOOKING_QUEUE_URL, AIRLINE_SEARCH_API_KEY } from '../config/env.config';
 import { publishToQueue } from '../queue/rabbitmq.queue';
+import { IFlightWithDetails } from '../interface/flight.interface';
 
 export class BookingService {
   private bookingRepository: BookingRepository;
@@ -15,53 +13,96 @@ export class BookingService {
     this.bookingRepository = new BookingRepository();
   }
 
-  async createBooking(data: {
-    user_email: string;
-    user_id: string;
-    flight_id: string;
-    seats: number;
-  }): Promise<IBooking> {
+  async createBooking(user_id: string, data: Omit<IBookingRequest, 'total_price'>[]): Promise<void> {
     try {
-      const flightDetails = await axios.get(`${AIRLINE_SEARCH_API_KEY}/flight/${data.flight_id}`);
-      if (!flightDetails) {
-        throw new Error('Flight not found');
-      }
-      const flightData = flightDetails.data;
-      if (flightData.airplane.capacity < data.seats) {
-        throw new Error('Not enough seats available');
-      }
-      const booking = await this.bookingRepository.createBooking({
-        user_id: data.user_id,
-        flight_id: data.flight_id,
-        seats: data.seats,
-        total_price: flightData.price * data.seats,
-        status: 'confirmed',
+      const map = new Map<
+        string,
+        {
+          economy: { seats: number; total_price: number };
+          premium: { seats: number; total_price: number };
+          business: { seats: number; total_price: number };
+        }
+      >();
+      data.forEach((bookingData) => {
+        if (!map.has(bookingData.flight_id)) {
+          map.set(bookingData.flight_id, {
+            economy: { seats: 0, total_price: 0 },
+            premium: { seats: 0, total_price: 0 },
+            business: { seats: 0, total_price: 0 },
+          });
+        }
+        const seatType = bookingData.seat_type;
+        map.get(bookingData.flight_id)![seatType].seats++;
       });
-      await axios.put(`${AIRLINE_SEARCH_API_KEY}/airplanes/capacity/${flightData.airplane.id}`, {
-        capacity: flightData.airplane.capacity - data.seats,
-      });
-      const notificationData: INotification = {
-        user_email: data.user_email,
-        seats: data.seats,
-        total_price: flightData.price * data.seats,
-        flight_number: flightData.flight_number,
-        departure_time: new Date(flightData.departure_time),
-        arrival_time: new Date(flightData.arrival_time),
-        airplane_name: flightData.airplane.name,
-        departure_airport_name: flightData.departure_airport.name,
-        departure_airport_city: flightData.departure_airport.city.name,
-        departure_airport_country: flightData.departure_airport.city.country.name,
-        arrival_airport_name: flightData.arrival_airport.name,
-        arrival_airport_city: flightData.arrival_airport.city.name,
-        arrival_airport_country: flightData.arrival_airport.city.country.name,
-      };
-      const subject = notificationSubject(flightData.flight_number, new Date(flightData.departure_time));
-      const body = notificationBody(notificationData);
-      const adjustedDate = new Date(flightData.departure_time);
-      // 4 hours before
-      adjustedDate.setHours(adjustedDate.getHours() - 4);
-      publishToQueue({ subject, body, email: data.user_email, notification_time: adjustedDate });
-      return booking;
+      for (const [flightId, value] of map.entries()) {
+        const flightDetails = await axios.get(`${AIRLINE_SEARCH_API_KEY}/flight/${flightId}`);
+        if (!flightDetails) {
+          throw new Error('Flight not found');
+        }
+        const flightData: IFlightWithDetails = flightDetails.data;
+        if (
+          flightData.class_window_price.economy.first_window_seats +
+            flightData.class_window_price.economy.second_window_seats +
+            flightData.class_window_price.economy.third_window_seats <
+            value.economy.seats ||
+          flightData.class_window_price.premium.first_window_seats +
+            flightData.class_window_price.premium.second_window_seats <
+            value.premium.seats ||
+          flightData.class_window_price.business.first_window_seats +
+            flightData.class_window_price.business.second_window_seats <
+            value.business.seats
+        ) {
+          throw new Error('Not enough seats available');
+        }
+        if (value.economy.seats > 0) {
+          if (flightData.class_window_price.economy.first_window_seats > 0) {
+            value.economy.total_price =
+              flightData.price * flightData.class_window_price.economy.first_window_percentage;
+          } else if (flightData.class_window_price.economy.second_window_seats > 0) {
+            value.economy.total_price =
+              flightData.price * flightData.class_window_price.economy.second_window_percentage;
+          } else {
+            value.economy.total_price =
+              flightData.price * flightData.class_window_price.economy.third_window_percentage;
+          }
+        }
+        if (value.premium.seats > 0) {
+          if (flightData.class_window_price.premium.first_window_seats > 0) {
+            value.premium.total_price =
+              flightData.price * flightData.class_window_price.premium.first_window_percentage;
+          } else {
+            value.premium.total_price =
+              flightData.price * flightData.class_window_price.premium.second_window_percentage;
+          }
+        }
+        if (value.business.seats > 0) {
+          if (flightData.class_window_price.business.first_window_seats > 0) {
+            value.business.total_price =
+              flightData.price * flightData.class_window_price.business.first_window_percentage;
+          } else {
+            value.premium.total_price =
+              flightData.price * flightData.class_window_price.business.second_window_percentage;
+          }
+        }
+      }
+      const date = new Date();
+      await Promise.all(
+        data.map(async (bookingData) => {
+          const booking = await this.bookingRepository.createBooking({
+            user_id,
+            flight_id: bookingData.flight_id,
+            total_price: map.get(bookingData.flight_id)![bookingData.seat_type].total_price,
+            email: bookingData.email!,
+            seat_type: bookingData.seat_type!,
+            date,
+          });
+          await publishToQueue(AIRLINE_BOOKING_QUEUE_URL, AIRLINE_BOOKING_QUEUE_NAME, {
+            booking_id: booking.id,
+            flight_id: booking.flight_id,
+          });
+          return booking;
+        }),
+      );
     } catch (error) {
       console.log('Error in BookingService: createBooking:', error);
       throw error;
@@ -98,7 +139,7 @@ export class BookingService {
     }
   }
 
-  async getBookingsByUserId(userId: string): Promise<IBooking[]> {
+  async getBookingsByUserId(userId: string): Promise<IBooking[][]> {
     try {
       const bookings = await this.bookingRepository.getBookingsByUserId(userId);
       return bookings;
