@@ -49,7 +49,7 @@ export function notificationBody(data: INotification): string {
           <div class="section">
             <p><span class="label">Flight Number:</span> ${data.flight_number}</p>
             <p><span class="label">Airplane:</span> ${data.airplane_name}</p>
-            <p><span class="label">Seats Booked:</span> ${data.seats}</p>
+            <p><span class="label">Seats Booked:</span> ${data.seatType}</p>
             <p><span class="label">Total Price:</span> ₹${data.total_price}</p>
           </div>
 
