@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { BookingService } from '../service/booking.service';
-import { IStatus } from '../types/status.types';
+import { IStatus } from '../types/booking.types';
+import { IBookingRequest } from '../interface/booking.interface';
 
 export class BookingController {
   private bookingService: BookingService;
@@ -11,22 +12,17 @@ export class BookingController {
 
   createBooking = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, id } = req;
-      if (!email || !id) {
+      const { id } = req;
+      if (!id) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
       }
-      const data: { flight_id: string; seats: number } = req.body;
-      if (!data.flight_id || !data.seats) {
-        res.status(400).json({ message: 'All fields are required' });
+      const data: (Omit<IBookingRequest, 'total_price'> & { flight_id: string })[] = req.body;
+      if (!data) {
+        res.status(400).json({ message: 'Flight ID and booking data are required' });
         return;
       }
-      const booking = await this.bookingService.createBooking({
-        flight_id: data.flight_id,
-        seats: data.seats,
-        user_id: id,
-        user_email: email,
-      });
+      const booking = await this.bookingService.createBooking(id, data);
       res.status(201).json(booking);
     } catch (error) {
       console.log('Error in BookingController: createBooking:', error);

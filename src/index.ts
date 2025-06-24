@@ -4,6 +4,7 @@ import cors from 'cors';
 import { corsOptions } from './util/cors.util';
 import { PORT } from './config/env.config';
 import { router } from './routes/index.route';
+import { subscribeToQueue } from './queue/rabbitmq.queue';
 
 const app = express();
 
@@ -21,4 +22,5 @@ app.use('/api/v1', router);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  subscribeToQueue();
 });
