@@ -1,11 +1,10 @@
-import { IStatus } from '../types/status.types';
+import { ISeat } from '../types/booking.types';
 
 export interface IBookingRequest {
-  user_id: string;
-  flight_id: string;
-  seats: number;
+  email: string;
   total_price: number;
-  status: IStatus;
+  seat_type: ISeat;
+  flight_id: string;
 }
 
 export interface IBooking extends IBookingRequest {

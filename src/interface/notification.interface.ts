@@ -1,6 +1,8 @@
+import { ISeat } from '../types/booking.types';
+
 export interface INotification {
   user_email: string;
-  seats: number;
+  seatType: ISeat;
   total_price: number;
   flight_number: string;
   departure_time: Date;
