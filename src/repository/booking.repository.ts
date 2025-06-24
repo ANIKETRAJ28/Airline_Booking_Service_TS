@@ -1,7 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import { getPool } from '../util/dbPool.util';
 import { IBooking, IBookingRequest } from '../interface/booking.interface';
-import { IStatus } from '../types/status.types';
+import { IStatus } from '../types/booking.types';
 
 export class BookingRepository {
   private pool: Pool;
@@ -10,13 +10,13 @@ export class BookingRepository {
     this.pool = getPool();
   }
 
-  async createBooking(data: IBookingRequest): Promise<IBooking> {
+  async createBooking(data: IBookingRequest & { flight_id: string; user_id: string; date: Date }): Promise<IBooking> {
     const client: PoolClient = await this.pool.connect();
     try {
       const query = `
-        INSERT INTO booking (user_id, flight_id, status, seats, total_price) values ($1, $2, $3, $4, $5)
+        INSERT INTO booking (user_id, flight_id, email, seat_type, total_price, created_at) values ($1, $2, $3, $4, $5, $6)
         RETURNING *`;
-      const values = [data.user_id, data.flight_id, data.status, data.seats, data.total_price];
+      const values = [data.user_id, data.flight_id, data.email, data.seat_type, data.total_price, data.date];
       const result = await client.query(query, values);
       const booking: IBooking = result.rows[0];
       return booking;
@@ -73,13 +73,24 @@ export class BookingRepository {
     }
   }
 
-  async getBookingsByUserId(userId: string): Promise<IBooking[]> {
+  async getBookingsByUserId(userId: string): Promise<IBooking[][]> {
     const client: PoolClient = await this.pool.connect();
     try {
       const query = `SELECT * FROM booking WHERE user_id = $1`;
       const result = await client.query(query, [userId]);
       const bookings: IBooking[] = result.rows;
-      return bookings;
+      const bookingResponse: IBooking[][] = [];
+      const map = new Map<string, IBooking[]>();
+      bookings.forEach((booking) => {
+        if (!map.has(booking.created_at.toISOString())) {
+          map.set(booking.created_at.toISOString(), []);
+        }
+        map.get(booking.created_at.toISOString())?.push(booking);
+      });
+      map.forEach((value) => {
+        bookingResponse.push(value);
+      });
+      return bookingResponse;
     } catch (error) {
       console.log('Error in BookingRepository: getBookingsByUserId:', error);
       throw error;
