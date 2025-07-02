@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { BookingService } from '../service/booking.service';
 import { IStatus } from '../types/booking.types';
 import { IBookingRequest } from '../interface/booking.interface';
+import { ApiError } from '../util/api.util';
+import { apiHandler, errorHandler } from '../util/apiHandler.util';
 
 export class BookingController {
   private bookingService: BookingService;
@@ -12,31 +14,27 @@ export class BookingController {
 
   createBooking = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { id } = req;
-      if (!id) {
-        res.status(401).json({ message: 'Unauthorized' });
-        return;
+      const { user_id } = req;
+      if (!user_id) {
+        throw new ApiError(401, 'Unauthorized');
       }
       const data: (Omit<IBookingRequest, 'total_price'> & { flight_id: string })[] = req.body;
       if (!data) {
-        res.status(400).json({ message: 'Flight ID and booking data are required' });
-        return;
+        throw new ApiError(400, 'Flight ID and booking data are required');
       }
-      const booking = await this.bookingService.createBooking(id, data);
-      res.status(201).json(booking);
+      const booking = await this.bookingService.createBooking(user_id, data);
+      apiHandler(res, 201, 'Booking created successfully', booking);
     } catch (error) {
-      console.log('Error in BookingController: createBooking:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      errorHandler(error, res);
     }
   };
 
   getAllBookings = async (_req: Request, res: Response): Promise<void> => {
     try {
       const bookings = await this.bookingService.getAllBookings();
-      res.status(200).json(bookings);
+      apiHandler(res, 200, 'Bookings retrieved successfully', bookings);
     } catch (error) {
-      console.log('Error in BookingController: getAllBookings:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      errorHandler(error, res);
     }
   };
 
@@ -44,18 +42,15 @@ export class BookingController {
     try {
       const id = req.params.id;
       if (!id) {
-        res.status(400).json({ message: 'Booking ID is required' });
-        return;
+        throw new ApiError(400, 'Booking ID is required');
       }
       const booking = await this.bookingService.getBookingById(id);
       if (!booking) {
-        res.status(404).json({ message: 'Booking not found' });
-        return;
+        throw new ApiError(404, 'Booking not found');
       }
-      res.status(200).json(booking);
+      apiHandler(res, 200, 'Booking fetched successfully', booking);
     } catch (error) {
-      console.log('Error in BookingController: getBookingById:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      errorHandler(error, res);
     }
   };
 
@@ -63,38 +58,29 @@ export class BookingController {
     try {
       const id = req.params.id;
       if (!id) {
-        res.status(400).json({ message: 'Booking ID is required' });
-        return;
+        throw new ApiError(400, 'Booking ID is required');
       }
       const status: IStatus = req.body.status;
       if (!status) {
-        res.status(400).json({ message: 'Status is required' });
-        return;
+        throw new ApiError(400, 'Booking status is required');
       }
       const booking = await this.bookingService.updateBookingStatus(id, status);
-      if (!booking) {
-        res.status(404).json({ message: 'Booking not found' });
-        return;
-      }
-      res.status(200).json(booking);
+      apiHandler(res, 200, 'Booking status updated successfully', booking);
     } catch (error) {
-      console.log('Error in BookingController: updateBookingStatus:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      errorHandler(error, res);
     }
   };
 
   getBookingsByUserId = async (req: Request, res: Response): Promise<void> => {
     try {
-      const userId = req.id;
+      const userId = req.user_id;
       if (!userId) {
-        res.status(400).json({ message: 'User ID is required' });
-        return;
+        throw new ApiError(401, 'Unauthorized');
       }
       const bookings = await this.bookingService.getBookingsByUserId(userId);
-      res.status(200).json(bookings);
+      apiHandler(res, 200, 'Bookings fetched successfully', bookings);
     } catch (error) {
-      console.log('Error in BookingController: getBookingsByUserId:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      errorHandler(error, res);
     }
   };
 
@@ -102,14 +88,12 @@ export class BookingController {
     try {
       const flight_id = req.params.flight_id;
       if (!flight_id) {
-        res.status(400).json({ message: 'Flight ID and date are required' });
-        return;
+        throw new ApiError(400, 'Flight ID is required');
       }
       const bookings = await this.bookingService.getBookingsForFlight(flight_id as string);
-      res.status(200).json(bookings);
+      apiHandler(res, 200, 'Bookings for flight fetched successfully', bookings);
     } catch (error) {
-      console.log('Error in BookingController: getBookingsForFlightByDate:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      errorHandler(error, res);
     }
   };
 }

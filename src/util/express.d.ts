@@ -5,6 +5,7 @@ declare global {
   namespace Express {
     interface Request {
       id?: string;
+      user_id?: string;
       email?: string;
       user_role?: 'user' | 'admin' | 'superadmin';
     }

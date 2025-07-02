@@ -13,6 +13,7 @@ import { IFlightWithDetails } from '../interface/flight.interface';
 import { INotification } from '../interface/notification.interface';
 import { notificationSubject } from '../util/notificationSubject.util';
 import { notificationBody } from '../util/notificationBody.util';
+import { ApiError } from '../util/api.util';
 
 export async function publishToQueue(
   queue_url: string,
@@ -88,9 +89,9 @@ export async function subscribeToQueue(): Promise<void> {
               });
               const flightDetails = await axios.get(`${AIRLINE_SEARCH_API_KEY}/flight/${flightId}`);
               if (!flightDetails) {
-                throw new Error('Flight not found');
+                throw new ApiError(404, 'Flight not found');
               }
-              const flightData: IFlightWithDetails = flightDetails.data;
+              const flightData: IFlightWithDetails = flightDetails.data.data;
               const notificationData: INotification = {
                 user_email: bookingDetails.email,
                 seatType: bookingDetails.seat_type,
@@ -123,7 +124,7 @@ export async function subscribeToQueue(): Promise<void> {
         });
       });
     });
-  } catch (error) {
-    console.error('Error publishing to RabbitMQ:', error);
+  } catch {
+    throw new ApiError(500, 'Error subscribing to RabbitMQ queue');
   }
 }

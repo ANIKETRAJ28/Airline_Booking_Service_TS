@@ -1,0 +1,18 @@
+2025-06-26T08:48:04.128Z 
+ [32minfo[39m: 
+ ID:              f2be7a82-f410-44ed-978b-e9f932d4543a
+Method:          POST
+URL:             /api/v1/booking
+Status:          201
+Content Length:  86
+Response Time:   502.369 ms
+
+2025-06-26T09:20:11.795Z 
+ [32minfo[39m: 
+ ID:              5fda6f69-0a44-4f68-bebb-4a2ce325f545
+Method:          POST
+URL:             /api/v1/booking
+Status:          201
+Content Length:  86
+Response Time:   244.234 ms
+
