@@ -10,5 +10,6 @@ bookingRouter.post('/', jwtMiddleware, bookingController.createBooking);
 bookingRouter.get('/', jwtMiddleware, checkAdminRole, bookingController.getAllBookings);
 bookingRouter.get('/id/:id', jwtMiddleware, checkAdminRole, bookingController.getBookingById);
 bookingRouter.get('/user', jwtMiddleware, bookingController.getBookingsByUserId);
+bookingRouter.get('/user/flight/:flight_id', jwtMiddleware, bookingController.getBookingsForFlightForUsers);
 bookingRouter.get('/flight/:flight_id', jwtMiddleware, checkAdminRole, bookingController.getBookingsForFlight);
 bookingRouter.put('/id/:id', jwtMiddleware, checkSuperAdminRole, bookingController.updateBookingStatus);

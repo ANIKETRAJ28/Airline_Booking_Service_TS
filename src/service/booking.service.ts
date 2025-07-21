@@ -1,8 +1,18 @@
 import axios from 'axios';
-import { IBooking, IBookingRequest } from '../interface/booking.interface';
+import {
+  IBooking,
+  IBookingRequest,
+  IBookingWithDetailsForAdmin,
+  IBookingWithDetailsForUser,
+} from '../interface/booking.interface';
 import { BookingRepository } from '../repository/booking.repository';
 import { IStatus } from '../types/booking.types';
-import { AIRLINE_BOOKING_QUEUE_NAME, AIRLINE_BOOKING_QUEUE_URL, AIRLINE_SEARCH_API_KEY } from '../config/env.config';
+import {
+  AIRLINE_AUTH_API_KEY,
+  AIRLINE_BOOKING_QUEUE_NAME,
+  AIRLINE_BOOKING_QUEUE_URL,
+  AIRLINE_SEARCH_API_KEY,
+} from '../config/env.config';
 import { publishToQueue } from '../queue/rabbitmq.queue';
 import { IFlightWithDetails } from '../interface/flight.interface';
 import { ApiError } from '../util/api.util';
@@ -89,6 +99,7 @@ export class BookingService {
           total_price: map.get(bookingData.flight_id)![bookingData.seat_type].total_price,
           email: bookingData.email!,
           seat_type: bookingData.seat_type!,
+          seat_number: bookingData.seat_number!,
           date,
         });
         await publishToQueue(AIRLINE_BOOKING_QUEUE_URL, AIRLINE_BOOKING_QUEUE_NAME, {
@@ -100,8 +111,8 @@ export class BookingService {
     );
   }
 
-  async getAllBookings(): Promise<IBooking[]> {
-    const bookings = await this.bookingRepository.getAllBookings();
+  async getAllBookings(limit: number, offset: number): Promise<IBooking[]> {
+    const bookings = await this.bookingRepository.getAllBookings(limit, offset);
     return bookings;
   }
 
@@ -115,13 +126,212 @@ export class BookingService {
     return booking;
   }
 
-  async getBookingsByUserId(userId: string): Promise<IBooking[][]> {
-    const bookings = await this.bookingRepository.getBookingsByUserId(userId);
-    return bookings;
+  async getBookingsByUserId(userId: string, limit: number, offset: number): Promise<IBookingWithDetailsForUser[][]> {
+    const bookings: IBooking[] = await this.bookingRepository.getBookingsByUserId(userId, limit, offset);
+    // Step 1: Group bookings by created_at timestamp
+    const bookingsByTime = new Map<string, IBooking[]>();
+    for (const booking of bookings) {
+      const timestamp = booking.created_at.toISOString();
+      if (!bookingsByTime.has(timestamp)) {
+        bookingsByTime.set(timestamp, []);
+      }
+      bookingsByTime.get(timestamp)!.push(booking);
+    }
+    // Step 2: Further group by flight_id within each timestamp
+    const bookingsByTimeAndFlight = new Map<string, Map<string, Omit<IBooking, 'flight_id'>[]>>();
+    for (const [timestamp, bookingList] of bookingsByTime.entries()) {
+      const flightMap = new Map<string, Omit<IBooking, 'flight_id'>[]>();
+      for (const booking of bookingList) {
+        if (!flightMap.has(booking.flight_id)) {
+          flightMap.set(booking.flight_id, []);
+        }
+        flightMap.get(booking.flight_id)!.push({
+          id: booking.id,
+          user_id: booking.user_id,
+          email: booking.email,
+          seat_type: booking.seat_type,
+          seat_number: booking.seat_number,
+          status: booking.status,
+          created_at: booking.created_at,
+          updated_at: booking.updated_at,
+          total_price: booking.total_price,
+        });
+      }
+      bookingsByTimeAndFlight.set(timestamp, flightMap);
+    }
+    // Step 3: Resolve all flight data and structure result
+    const groupedBookings: IBookingWithDetailsForUser[][] = [];
+
+    for (const [, flightMap] of bookingsByTimeAndFlight.entries()) {
+      const group: IBookingWithDetailsForUser[] = [];
+
+      for (const [flightId, bookings] of flightMap.entries()) {
+        const flightRes = await axios.get(`${AIRLINE_SEARCH_API_KEY}/flight/${flightId}`);
+        if (!flightRes?.data?.data) {
+          throw new ApiError(404, 'Flight not found');
+        }
+        const flightData: IFlightWithDetails = flightRes.data.data;
+        group.push({
+          flight: {
+            id: flightData.id,
+            flight_number: flightData.flight_number,
+            status: flightData.status,
+            departure_time: flightData.departure_time,
+            arrival_time: flightData.arrival_time,
+            created_at: flightData.created_at,
+            updated_at: flightData.updated_at,
+            departure_airport: {
+              id: flightData.departure_airport.id,
+              name: flightData.departure_airport.name,
+              code: flightData.departure_airport.code,
+              city: {
+                id: flightData.departure_airport.city.id,
+                name: flightData.departure_airport.city.name,
+                country: {
+                  id: flightData.departure_airport.city.country.id,
+                  name: flightData.departure_airport.city.country.name,
+                  created_at: flightData.departure_airport.city.country.created_at,
+                  updated_at: flightData.departure_airport.city.country.updated_at,
+                },
+                created_at: flightData.departure_airport.city.created_at,
+                updated_at: flightData.departure_airport.city.updated_at,
+              },
+              created_at: flightData.departure_airport.created_at,
+              updated_at: flightData.departure_airport.updated_at,
+            },
+            arrival_airport: {
+              id: flightData.arrival_airport.id,
+              name: flightData.arrival_airport.name,
+              code: flightData.arrival_airport.code,
+              city: {
+                id: flightData.arrival_airport.city.id,
+                name: flightData.arrival_airport.city.name,
+                country: {
+                  id: flightData.arrival_airport.city.country.id,
+                  name: flightData.arrival_airport.city.country.name,
+                  created_at: flightData.arrival_airport.city.country.created_at,
+                  updated_at: flightData.arrival_airport.city.country.updated_at,
+                },
+                created_at: flightData.arrival_airport.city.created_at,
+                updated_at: flightData.arrival_airport.city.updated_at,
+              },
+              created_at: flightData.arrival_airport.created_at,
+              updated_at: flightData.arrival_airport.updated_at,
+            },
+            airplane: {
+              id: flightData.airplane.id,
+              name: flightData.airplane.name,
+              code: flightData.airplane.code,
+              created_at: flightData.airplane.created_at,
+              updated_at: flightData.airplane.updated_at,
+            },
+          },
+          bookings,
+        });
+      }
+      group.sort((a, b) => a.flight.departure_time.getTime() - b.flight.departure_time.getTime());
+      groupedBookings.push(group);
+    }
+    return groupedBookings;
   }
 
-  async getBookingsForFlight(flightId: string): Promise<IBooking[]> {
+  async getBookingsForFlight(flightId: string): Promise<IBookingWithDetailsForAdmin> {
     const bookings = await this.bookingRepository.getBookingsForFlight(flightId);
-    return bookings;
+    const flightRes = await axios.get(`${AIRLINE_SEARCH_API_KEY}/flight/${flightId}`);
+    if (!flightRes?.data?.data) {
+      throw new ApiError(404, 'Flight not found');
+    }
+    const flightData: IFlightWithDetails = flightRes.data.data;
+    const bookingsWithDetail = await Promise.all(
+      bookings.map(
+        async (
+          booking,
+        ): Promise<
+          Omit<IBooking, 'user_id' | 'email' | 'flight_id'> & {
+            booking_email: string;
+            user_email: string;
+          }
+        > => {
+          const userRes = await axios.get(`${AIRLINE_AUTH_API_KEY}/user/id/${booking.user_id}`);
+          if (!userRes?.data?.data) {
+            throw new ApiError(404, 'User not found');
+          }
+          const userData = userRes.data.data;
+          return {
+            id: booking.id,
+            seat_number: booking.seat_number,
+            seat_type: booking.seat_type,
+            total_price: booking.total_price,
+            status: booking.status,
+            booking_email: booking.email,
+            user_email: userData.email,
+            created_at: booking.created_at,
+            updated_at: booking.updated_at,
+          };
+        },
+      ),
+    );
+    return {
+      flight: {
+        id: flightData.id,
+        flight_number: flightData.flight_number,
+        status: flightData.status,
+        departure_time: flightData.departure_time,
+        arrival_time: flightData.arrival_time,
+        created_at: flightData.created_at,
+        updated_at: flightData.updated_at,
+        departure_airport: {
+          id: flightData.departure_airport.id,
+          name: flightData.departure_airport.name,
+          code: flightData.departure_airport.code,
+          city: {
+            id: flightData.departure_airport.city.id,
+            name: flightData.departure_airport.city.name,
+            country: {
+              id: flightData.departure_airport.city.country.id,
+              name: flightData.departure_airport.city.country.name,
+              created_at: flightData.departure_airport.city.country.created_at,
+              updated_at: flightData.departure_airport.city.country.updated_at,
+            },
+            created_at: flightData.departure_airport.city.created_at,
+            updated_at: flightData.departure_airport.city.updated_at,
+          },
+          created_at: flightData.departure_airport.created_at,
+          updated_at: flightData.departure_airport.updated_at,
+        },
+        arrival_airport: {
+          id: flightData.arrival_airport.id,
+          name: flightData.arrival_airport.name,
+          code: flightData.arrival_airport.code,
+          city: {
+            id: flightData.arrival_airport.city.id,
+            name: flightData.arrival_airport.city.name,
+            country: {
+              id: flightData.arrival_airport.city.country.id,
+              name: flightData.arrival_airport.city.country.name,
+              created_at: flightData.arrival_airport.city.country.created_at,
+              updated_at: flightData.arrival_airport.city.country.updated_at,
+            },
+            created_at: flightData.arrival_airport.city.created_at,
+            updated_at: flightData.arrival_airport.city.updated_at,
+          },
+          created_at: flightData.arrival_airport.created_at,
+          updated_at: flightData.arrival_airport.updated_at,
+        },
+        airplane: {
+          id: flightData.airplane.id,
+          name: flightData.airplane.name,
+          code: flightData.airplane.code,
+          capacity: flightData.airplane.capacity,
+          created_at: flightData.airplane.created_at,
+          updated_at: flightData.airplane.updated_at,
+        },
+      },
+      bookings: bookingsWithDetail,
+    };
+  }
+
+  async getBookingsForFlightForUsers(flightId: string): Promise<{ id: string; seat_number: string }[]> {
+    return this.bookingRepository.getBookingsForFlightForUsers(flightId);
   }
 }

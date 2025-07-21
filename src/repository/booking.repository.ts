@@ -14,12 +14,26 @@ export class BookingRepository {
   async createBooking(data: IBookingRequest & { flight_id: string; user_id: string; date: Date }): Promise<IBooking> {
     const client: PoolClient = await this.pool.connect();
     try {
-      const query = `INSERT INTO booking 
-                    (user_id, flight_id, email, seat_type, total_price, created_at) 
-                    values ($1, $2, $3, $4, $5, $6) 
+      let query = `SELECT * FROM booking WHERE flight_id = $1 AND seat_number = $2`;
+      const v = [data.flight_id, data.seat_number];
+      let result = await client.query(query, v);
+      if (result.rows.length > 0) {
+        throw new ApiError(400, 'Seat already booked');
+      }
+      query = `INSERT INTO booking 
+                    (user_id, flight_id, email, seat_type, total_price, seat_number, created_at) 
+                    values ($1, $2, $3, $4, $5, $6, $7) 
                     RETURNING *`;
-      const values = [data.user_id, data.flight_id, data.email, data.seat_type, data.total_price, data.date];
-      const result = await client.query(query, values);
+      const values = [
+        data.user_id,
+        data.flight_id,
+        data.email,
+        data.seat_type,
+        data.total_price,
+        data.seat_number,
+        data.date,
+      ];
+      result = await client.query(query, values);
       const booking: IBooking = result.rows[0];
       return booking;
     } finally {
@@ -27,11 +41,11 @@ export class BookingRepository {
     }
   }
 
-  async getAllBookings(): Promise<IBooking[]> {
+  async getAllBookings(limit: number, offset: number): Promise<IBooking[]> {
     const client: PoolClient = await this.pool.connect();
     try {
-      const query = `SELECT * FROM booking`;
-      const result = await client.query(query);
+      const query = `SELECT * FROM booking order by created_at DESC LIMIT $1 OFFSET $2`;
+      const result = await client.query(query, [limit, offset]);
       const bookings: IBooking[] = result.rows;
       return bookings;
     } finally {
@@ -71,24 +85,13 @@ export class BookingRepository {
     }
   }
 
-  async getBookingsByUserId(userId: string): Promise<IBooking[][]> {
+  async getBookingsByUserId(userId: string, limit: number, offset: number): Promise<IBooking[]> {
     const client: PoolClient = await this.pool.connect();
     try {
-      const query = `SELECT * FROM booking WHERE user_id = $1`;
-      const result = await client.query(query, [userId]);
+      const query = `SELECT * FROM booking WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
+      const result = await client.query(query, [userId, limit, offset]);
       const bookings: IBooking[] = result.rows;
-      const bookingResponse: IBooking[][] = [];
-      const map = new Map<string, IBooking[]>();
-      bookings.forEach((booking) => {
-        if (!map.has(booking.created_at.toISOString())) {
-          map.set(booking.created_at.toISOString(), []);
-        }
-        map.get(booking.created_at.toISOString())!.push(booking);
-      });
-      map.forEach((value) => {
-        bookingResponse.push(value);
-      });
-      return bookingResponse;
+      return bookings;
     } finally {
       client.release();
     }
@@ -101,6 +104,22 @@ export class BookingRepository {
       const result = await client.query(query, [flightId]);
       const bookings: IBooking[] = result.rows;
       return bookings;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getBookingsForFlightForUsers(flightId: string): Promise<{ id: string; seat_number: string }[]> {
+    const client: PoolClient = await this.pool.connect();
+    try {
+      const query = `SELECT * FROM booking WHERE flight_id = $1`;
+      const result = await client.query(query, [flightId]);
+      const bookings: IBooking[] = result.rows;
+      const bookingRespose: { id: string; seat_number: string }[] = bookings.map((booking) => ({
+        id: booking.id,
+        seat_number: booking.seat_number,
+      }));
+      return bookingRespose;
     } finally {
       client.release();
     }

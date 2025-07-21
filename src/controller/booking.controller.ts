@@ -22,6 +22,11 @@ export class BookingController {
       if (!data) {
         throw new ApiError(400, 'Flight ID and booking data are required');
       }
+      data.forEach((bookingData) => {
+        if (!/^(?:[0-9]|1[0-9]|2[0-5])[A-F]$/.test(bookingData.seat_number)) {
+          throw new ApiError(400, 'Invalid seat number format');
+        }
+      });
       const booking = await this.bookingService.createBooking(user_id, data);
       apiHandler(res, 201, 'Booking created successfully', booking);
     } catch (error) {
@@ -29,9 +34,11 @@ export class BookingController {
     }
   };
 
-  getAllBookings = async (_req: Request, res: Response): Promise<void> => {
+  getAllBookings = async (req: Request, res: Response): Promise<void> => {
     try {
-      const bookings = await this.bookingService.getAllBookings();
+      const limit = 10;
+      const offset = req.body.offset || 0;
+      const bookings = await this.bookingService.getAllBookings(limit, offset);
       apiHandler(res, 200, 'Bookings retrieved successfully', bookings);
     } catch (error) {
       errorHandler(error, res);
@@ -77,7 +84,9 @@ export class BookingController {
       if (!userId) {
         throw new ApiError(401, 'Unauthorized');
       }
-      const bookings = await this.bookingService.getBookingsByUserId(userId);
+      const limit = 10;
+      const offset = req.body.offset || 0;
+      const bookings = await this.bookingService.getBookingsByUserId(userId, limit, offset);
       apiHandler(res, 200, 'Bookings fetched successfully', bookings);
     } catch (error) {
       errorHandler(error, res);
@@ -91,6 +100,19 @@ export class BookingController {
         throw new ApiError(400, 'Flight ID is required');
       }
       const bookings = await this.bookingService.getBookingsForFlight(flight_id as string);
+      apiHandler(res, 200, 'Bookings for flight fetched successfully', bookings);
+    } catch (error) {
+      errorHandler(error, res);
+    }
+  };
+
+  getBookingsForFlightForUsers = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const flight_id = req.params.flight_id;
+      if (!flight_id) {
+        throw new ApiError(400, 'Flight ID is required');
+      }
+      const bookings = await this.bookingService.getBookingsForFlightForUsers(flight_id as string);
       apiHandler(res, 200, 'Bookings for flight fetched successfully', bookings);
     } catch (error) {
       errorHandler(error, res);

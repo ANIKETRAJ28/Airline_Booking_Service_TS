@@ -1,79 +1,187 @@
-import { INotification } from '../interface/notification.interface';
+import { formatDuration } from './formatDuration.util';
 
-export function notificationBody(data: INotification): string {
+export const notificationBody = (
+  flight: {
+    flight_number: string;
+    from_city: string;
+    from_country: string;
+    from_airport_name: string;
+    from_airport_code: string;
+    to_city: string;
+    to_country: string;
+    to_airport_name: string;
+    to_airport_code: string;
+    departure_time: string;
+    arrival_time: string;
+  },
+  passenger: { email: string; seat_number: string; class: string; price: number; booking_id: string },
+): string => {
   return `
-    <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            padding: 20px;
-            color: #333;
-          }
-          .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-          }
-          h2 {
-            color: #2e8b57;
-          }
-          .section {
-            margin-top: 20px;
-            line-height: 1.6;
-          }
-          .label {
-            font-weight: bold;
-            color: #555;
-          }
-          .footer {
-            margin-top: 30px;
-            font-size: 12px;
-            color: #888;
-            text-align: center;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h2>✅ Booking Confirmation</h2>
-          <p>Dear Customer,</p>
-          <p>Your flight booking has been successfully confirmed. Please find your flight and booking details below:</p>
+  <!DOCTYPE html>
+<html>
 
-          <div class="section">
-            <p><span class="label">Flight Number:</span> ${data.flight_number}</p>
-            <p><span class="label">Airplane:</span> ${data.airplane_name}</p>
-            <p><span class="label">Seats Booked:</span> ${data.seatType}</p>
-            <p><span class="label">Total Price:</span> ₹${data.total_price}</p>
-          </div>
+<head>
+  <meta charset="UTF-8" />
+  <title>Booking Confirmation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 20px;
+      color: #1f2937;
+    }
 
-          <div class="section">
-            <h3>🛫 Departure</h3>
-            <p><span class="label">Airport:</span> ${data.departure_airport_name}, ${data.departure_airport_city}, ${data.departure_airport_country}</p>
-            <p><span class="label">Time:</span> ${data.departure_time.getDate()}/${data.departure_time.getMonth() + 1}/${data.departure_time.getFullYear()} ${data.departure_time.getHours()}:${data.departure_time.getMinutes()}</p>
-          </div>
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
 
-          <div class="section">
-            <h3>🛬 Arrival</h3>
-            <p><span class="label">Airport:</span> ${data.arrival_airport_name}, ${data.arrival_airport_city}, ${data.arrival_airport_country}</p>
-            <p><span class="label">Time:</span> ${data.arrival_time.getDate()}/${data.arrival_time.getMonth() + 1}/${data.arrival_time.getFullYear()} ${data.arrival_time.getHours()}:${data.arrival_time.getMinutes()}</p>
-          </div>
+    .header {
+      background-color: #f97316;
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
 
-          <p>Please carry a valid ID and arrive at the airport at least 2 hours prior to departure.</p>
-          <p>We look forward to having you on board. Safe travels!</p>
+    .section {
+      padding: 24px;
+      border-bottom: 1px solid #e5e7eb;
+    }
 
-          <div class="footer">
-            This confirmation was sent to ${data.user_email}.  
-            <br />SkyWings Airlines © 2025
-          </div>
+    .section:last-child {
+      border-bottom: none;
+    }
+
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      background-color: #f9fafb;
+    }
+
+    .label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #6b7280;
+    }
+
+    .value {
+      font-size: 16px;
+      font-weight: 500;
+      color: #111827;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Booking Confirmed</h1>
+      <p>Your reservation is successful. Below are your flight details.</p>
+    </div>
+
+    <div class="section">
+      <h2>Flight Information</h2>
+      <div class="card grid">
+        <div>
+          <div class="label">Flight Number</div>
+          <div class="value">${flight.flight_number}</div>
         </div>
-      </body>
-      </html>
-  `;
-}
+        <div>
+          <div class="label">Duration</div>
+          <div class="value">${formatDuration(flight.departure_time, flight.arrival_time)}</div>
+        </div>
+        <div>
+          <div class="label">From</div>
+          <div class="value">${flight.from_city}, ${flight.from_city}</div>
+        </div>
+        <div>
+          <div class="label">To</div>
+          <div class="value">${flight.to_city}, ${flight.to_country}</div>
+        </div>
+        <div>
+          <div class="label">Departure Airport</div>
+          <div class="value">${flight.from_airport_name} (${flight.from_airport_code})</div>
+        </div>
+        <div>
+          <div class="label">Arrival Airport</div>
+          <div class="value">${flight.to_airport_name} (${flight.to_airport_code})</div>
+        </div>
+        <div>
+          <div class="label">Departure</div>
+          <div class="value">${new Date(flight.departure_time).toISOString().slice(11, 16)}, ${new Date(
+            flight.departure_time,
+          ).toLocaleDateString([], {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}</div>
+        </div>
+        <div>
+          <div class="label">Arrival</div>
+          <div class="value">${new Date(flight.arrival_time).toISOString().slice(11, 16)}, ${new Date(
+            flight.arrival_time,
+          ).toLocaleDateString([], {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Passenger Details</h2>
+      <div class="card grid">
+        <div>
+          <div class="label">Email</div>
+          <div class="value">${passenger.email}</div>
+        </div>
+        <div>
+          <div class="label">Seat</div>
+          <div class="value">${passenger.seat_number}</div>
+        </div>
+        <div>
+          <div class="label">Class</div>
+          <div class="value">${passenger.class.charAt(0).toUpperCase + passenger.class.slice(1)}</div>
+        </div>
+        <div>
+          <div class="label">Price</div>
+          <div class="value">₹${passenger.price}</div>
+        </div>
+        <div>
+          <div class="label">Booking ID</div>
+          <div class="value">${passenger.booking_id}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Sky Wings Airlines Pvt. Ltd. <br />
+      &copy; 2025 All rights reserved.
+    </div>
+  </div>
+</body>
+
+</html>`;
+};

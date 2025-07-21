@@ -5,14 +5,14 @@ import { corsOptions } from './util/cors.util';
 import { PORT } from './config/env.config';
 import { router } from './routes/index.route';
 import { subscribeToQueue } from './queue/rabbitmq.queue';
-import { requestMiddleware } from './middleware/request.middleware';
-import { errorMorgon, infoMorgan } from './logs/morgon.logs';
+// import { requestMiddleware } from './middleware/request.middleware';
+// import { errorMorgon, infoMorgan } from './logs/morgon.logs';
 
 const app = express();
 
-app.use(requestMiddleware);
-app.use(errorMorgon);
-app.use(infoMorgan);
+// app.use(requestMiddleware);
+// app.use(errorMorgon);
+// app.use(infoMorgan);
 
 app.use(cors(corsOptions));
 app.use(express.json());

@@ -10,7 +10,6 @@ import {
 import { BookingRepository } from '../repository/booking.repository';
 import axios from 'axios';
 import { IFlightWithDetails } from '../interface/flight.interface';
-import { INotification } from '../interface/notification.interface';
 import { notificationSubject } from '../util/notificationSubject.util';
 import { notificationBody } from '../util/notificationBody.util';
 import { ApiError } from '../util/api.util';
@@ -92,30 +91,51 @@ export async function subscribeToQueue(): Promise<void> {
                 throw new ApiError(404, 'Flight not found');
               }
               const flightData: IFlightWithDetails = flightDetails.data.data;
-              const notificationData: INotification = {
-                user_email: bookingDetails.email,
-                seatType: bookingDetails.seat_type,
-                total_price: bookingDetails.total_price,
+              const notificationFlightData = {
                 flight_number: flightData.flight_number,
-                departure_time: new Date(flightData.departure_time),
-                arrival_time: new Date(flightData.arrival_time),
-                airplane_name: flightData.airplane.name,
-                departure_airport_name: flightData.departure_airport.name,
-                departure_airport_city: flightData.departure_airport.city.name,
-                departure_airport_country: flightData.departure_airport.city.country.name,
-                arrival_airport_name: flightData.arrival_airport.name,
-                arrival_airport_city: flightData.arrival_airport.city.name,
-                arrival_airport_country: flightData.arrival_airport.city.country.name,
+                from_city: flightData.departure_airport.city.name,
+                from_country: flightData.departure_airport.city.country.name,
+                from_airport_name: flightData.departure_airport.name,
+                from_airport_code: flightData.departure_airport.code,
+                to_city: flightData.arrival_airport.city.name,
+                to_country: flightData.arrival_airport.city.country.name,
+                to_airport_name: flightData.arrival_airport.name,
+                to_airport_code: flightData.arrival_airport.code,
+                departure_time: flightData.departure_time + '',
+                arrival_time: flightData.arrival_time + '',
               };
-              const subject = notificationSubject(flightData.flight_number, new Date(flightData.departure_time));
-              const body = notificationBody(notificationData);
+              const notificationPassagerData = {
+                email: bookingDetails.email,
+                seat_number: bookingDetails.seat_number,
+                class: bookingDetails.seat_type as string,
+                price: bookingDetails.total_price,
+                booking_id: bookingDetails.id,
+              };
+              const subject = notificationSubject(flightData.flight_number, flightData.departure_time + '');
+              const body = notificationBody(notificationFlightData, notificationPassagerData);
               const adjustedDate = new Date(flightData.departure_time);
               // 4 hours before
               adjustedDate.setHours(adjustedDate.getHours() - 4);
               publishToQueue(AIRLINE_REMINDER_QUEUE_URL, AIRLINE_REMINDER_QUEUE_NAME, {
                 subject,
                 body,
-                email: bookingDetails.email,
+                reminder_data: {
+                  arrival_time: flightData.arrival_time + '',
+                  booking_id: bookingDetails.id,
+                  departure_time: flightData.departure_time + '',
+                  flight_number: flightData.flight_number,
+                  from_airport_code: flightData.departure_airport.code,
+                  from_airport_name: flightData.departure_airport.name,
+                  from_city: flightData.departure_airport.city.name,
+                  from_country: flightData.departure_airport.city.country.name,
+                  to_airport_code: flightData.arrival_airport.code,
+                  to_airport_name: flightData.arrival_airport.name,
+                  to_city: flightData.arrival_airport.city.name,
+                  to_country: flightData.arrival_airport.city.country.name,
+                  seat_number: bookingDetails.seat_number,
+                  seat_type: bookingDetails.seat_type,
+                  email: bookingDetails.email,
+                },
                 notification_time: adjustedDate,
               });
               channel.ack(msg); // acknowledge the message

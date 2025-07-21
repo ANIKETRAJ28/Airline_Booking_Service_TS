@@ -1,10 +1,9 @@
-export interface IFlightWithDetails {
+export interface IFlight {
   id: string;
   flight_number: string;
   departure_time: Date;
   arrival_time: Date;
   status: 'SCHEDULED' | 'BOARDING' | 'IN_FLIGHT' | 'LANDED' | 'COMPLETED' | 'DELAYED' | 'CANCELLED';
-  price: number;
   created_at: Date;
   updated_at: Date;
   airplane: {
@@ -53,6 +52,10 @@ export interface IFlightWithDetails {
     created_at: Date;
     updated_at: Date;
   };
+}
+
+export interface IFlightWithDetails extends IFlight {
+  price: number;
   class_window_price: {
     economy: {
       first_window_seats: number;
