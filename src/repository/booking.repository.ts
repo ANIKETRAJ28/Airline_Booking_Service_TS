@@ -85,11 +85,11 @@ export class BookingRepository {
     }
   }
 
-  async getBookingsByUserId(userId: string, limit: number, offset: number): Promise<IBooking[]> {
+  async getBookingsByUserId(userId: string): Promise<IBooking[]> {
     const client: PoolClient = await this.pool.connect();
     try {
-      const query = `SELECT * FROM booking WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
-      const result = await client.query(query, [userId, limit, offset]);
+      const query = `SELECT * FROM booking WHERE user_id = $1 ORDER BY created_at DESC`;
+      const result = await client.query(query, [userId]);
       const bookings: IBooking[] = result.rows;
       return bookings;
     } finally {
@@ -120,6 +120,31 @@ export class BookingRepository {
         seat_number: booking.seat_number,
       }));
       return bookingRespose;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getBookingByFlightIdAndSeatNumber(flightId: string, seatNumber: string): Promise<IBooking | null> {
+    const client: PoolClient = await this.pool.connect();
+    try {
+      const query = `SELECT * FROM booking WHERE flight_id = $1 AND seat_number = $2`;
+      const result = await client.query(query, [flightId, seatNumber]);
+      if (result.rows.length === 0) {
+        return null;
+      }
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async getBookingsByFlightIdAndUserId(flightId: string, userId: string): Promise<IBooking[]> {
+    const client: PoolClient = await this.pool.connect();
+    try {
+      const query = `SELECT * FROM booking WHERE flight_id = $1 AND user_id = $2`;
+      const result = await client.query(query, [flightId, userId]);
+      return result.rows;
     } finally {
       client.release();
     }

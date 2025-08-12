@@ -50,46 +50,58 @@ export class BookingService {
         throw new ApiError(404, 'Flight not found');
       }
       const flightData: IFlightWithDetails = flightDetails.data.data;
+      const flightsForFlightByUser = await this.bookingRepository.getBookingsByFlightIdAndUserId(flightId, user_id);
+      if (flightsForFlightByUser.length + value.economy.seats + value.premium.seats + value.business.seats > 5) {
+        throw new ApiError(400, `You can only book a maximum of 5 seats for flight ${flightData.flight_number}`);
+      }
+      const { business, economy, premium } = flightData.class_window_price;
       if (
-        flightData.class_window_price.economy.first_window_seats +
-          flightData.class_window_price.economy.second_window_seats +
-          flightData.class_window_price.economy.third_window_seats <
+        economy.first_window_remaining_seats +
+          economy.second_window_remaining_seats +
+          economy.third_window_remaining_seats <
           value.economy.seats ||
-        flightData.class_window_price.premium.first_window_seats +
-          flightData.class_window_price.premium.second_window_seats <
-          value.premium.seats ||
-        flightData.class_window_price.business.first_window_seats +
-          flightData.class_window_price.business.second_window_seats <
-          value.business.seats
+        premium.first_window_remaining_seats + premium.second_window_remaining_seats < value.premium.seats ||
+        business.first_window_remaining_seats + business.second_window_remaining_seats < value.business.seats
       ) {
         throw new ApiError(400, 'Not enough seats available');
       }
       if (value.economy.seats > 0) {
-        if (flightData.class_window_price.economy.first_window_seats > 0) {
-          value.economy.total_price = flightData.price * flightData.class_window_price.economy.first_window_percentage;
-        } else if (flightData.class_window_price.economy.second_window_seats > 0) {
-          value.economy.total_price = flightData.price * flightData.class_window_price.economy.second_window_percentage;
+        if (economy.first_window_remaining_seats > 0) {
+          value.economy.total_price = flightData.price * economy.first_window_percentage;
+        } else if (economy.second_window_remaining_seats > 0) {
+          value.economy.total_price = flightData.price * economy.second_window_percentage;
         } else {
-          value.economy.total_price = flightData.price * flightData.class_window_price.economy.third_window_percentage;
+          value.economy.total_price = flightData.price * economy.third_window_percentage;
         }
       }
       if (value.premium.seats > 0) {
-        if (flightData.class_window_price.premium.first_window_seats > 0) {
-          value.premium.total_price = flightData.price * flightData.class_window_price.premium.first_window_percentage;
+        if (premium.first_window_remaining_seats > 0) {
+          value.premium.total_price = flightData.price * premium.first_window_percentage;
         } else {
-          value.premium.total_price = flightData.price * flightData.class_window_price.premium.second_window_percentage;
+          value.premium.total_price = flightData.price * premium.second_window_percentage;
         }
       }
       if (value.business.seats > 0) {
-        if (flightData.class_window_price.business.first_window_seats > 0) {
-          value.business.total_price =
-            flightData.price * flightData.class_window_price.business.first_window_percentage;
+        if (business.first_window_remaining_seats > 0) {
+          value.business.total_price = flightData.price * business.first_window_percentage;
         } else {
-          value.premium.total_price =
-            flightData.price * flightData.class_window_price.business.second_window_percentage;
+          value.business.total_price = flightData.price * business.second_window_percentage;
         }
       }
     }
+    await Promise.all(
+      data.map(async (bookingData) => {
+        const flightId = bookingData.flight_id;
+        const seatNumber = bookingData.seat_number;
+        const flightByFlightIdAndSeatNumber = await this.bookingRepository.getBookingByFlightIdAndSeatNumber(
+          flightId,
+          seatNumber,
+        );
+        if (flightByFlightIdAndSeatNumber) {
+          throw new ApiError(400, 'Seat already booked');
+        }
+      }),
+    );
     const date = new Date();
     await Promise.all(
       data.map(async (bookingData) => {
@@ -126,8 +138,8 @@ export class BookingService {
     return booking;
   }
 
-  async getBookingsByUserId(userId: string, limit: number, offset: number): Promise<IBookingWithDetailsForUser[][]> {
-    const bookings: IBooking[] = await this.bookingRepository.getBookingsByUserId(userId, limit, offset);
+  async getBookingsByUserId(userId: string): Promise<IBookingWithDetailsForUser[][]> {
+    const bookings: IBooking[] = await this.bookingRepository.getBookingsByUserId(userId);
     // Step 1: Group bookings by created_at timestamp
     const bookingsByTime = new Map<string, IBooking[]>();
     for (const booking of bookings) {
@@ -322,7 +334,9 @@ export class BookingService {
           id: flightData.airplane.id,
           name: flightData.airplane.name,
           code: flightData.airplane.code,
-          capacity: flightData.airplane.capacity,
+          business_class_seats: flightData.airplane.business_class_seats,
+          premium_class_seats: flightData.airplane.premium_class_seats,
+          economy_class_seats: flightData.airplane.economy_class_seats,
           created_at: flightData.airplane.created_at,
           updated_at: flightData.airplane.updated_at,
         },

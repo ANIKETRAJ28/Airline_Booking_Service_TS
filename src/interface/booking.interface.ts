@@ -31,16 +31,7 @@ export interface IBookingWithDetailsForUser {
 }
 
 export interface IBookingWithDetailsForAdmin {
-  flight: Omit<IFlight, 'airplane'> & {
-    airplane: {
-      id: string;
-      name: string;
-      code: string;
-      capacity: number;
-      created_at: Date;
-      updated_at: Date;
-    };
-  };
+  flight: IFlight;
   bookings: (Omit<IBooking, 'flight_id' | 'user_id' | 'email'> & {
     booking_email: string;
     user_email: string;
